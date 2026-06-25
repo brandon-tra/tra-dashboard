@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRA Client Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f11;
+      --surface: #18181c;
+      --border: #2a2a30;
+      --accent: #c8f135;
+      --text: #f0f0f0;
+      --muted: #888;
+      --radius: 10px;
+      --gap: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo span { color: var(--accent); }
+
+    .range-toggle {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .range-toggle button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .range-toggle button.active {
+      background: var(--accent);
+      color: #0f0f11;
+    }
+
+    .range-toggle button:hover:not(.active) {
+      color: var(--text);
+    }
+
+    main {
+      padding: 28px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: var(--gap);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .status-dot.loading { background: #f5a623; }
+    .status-dot.ok { background: var(--accent); }
+    .status-dot.error { background: #e74c3c; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .chart-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    .chart-card canvas { max-height: 260px; }
+
+    .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 180px;
+      color: var(--muted);
+      font-size: 13px;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+    }
+
+    @media (max-width: 700px) {
+      header { flex-direction: column; gap: 14px; align-items: flex-start; }
+      .chart-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">That Random <span>Agency</span></div>
+  <div class="range-toggle">
+    <button data-range="7d">7d</button>
+    <button data-range="30d" class="active">30d</button>
+    <button data-range="90d">90d</button>
+    <button data-range="month_current">This month</button>
+    <button data-range="month_previous">Last month</button>
+  </div>
+</header>
+
+<main>
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Loading data…</span>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Sessions</div>
+      <div class="kpi-value" id="kpi-sessions">—</div>
+      <div class="kpi-sub" id="kpi-sessions-sub">GA4</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active Users</div>
+      <div class="kpi-value" id="kpi-users">—</div>
+      <div class="kpi-sub">GA4</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Social Accounts</div>
+      <div class="kpi-value" id="kpi-accounts">—</div>
+      <div class="kpi-sub">Metricool</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg. Session</div>
+      <div class="kpi-value" id="kpi-duration">—</div>
+      <div class="kpi-sub">GA4</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Sessions by Channel</h3>
+      <canvas id="chart-sessions"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Social Performance</h3>
+      <div class="placeholder" id="social-placeholder">
+        Connect Metricool to see social data
+      </div>
+      <canvas id="chart-social" style="display:none;"></canvas>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ─── State ────────────────────────────────────────────────────────────────
+  let activeRange = "30d";
+  let charts = {};
+
+  // ─── Range toggle ─────────────────────────────────────────────────────────
+  document.querySelectorAll(".range-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".range-toggle button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeRange = btn.dataset.range;
+      loadAll();
+    });
+  });
+
+  // ─── Status helpers ───────────────────────────────────────────────────────
+  function setStatus(state, text) {
+    const dot = document.getElementById("status-dot");
+    dot.className = `status-dot ${state}`;
+    document.getElementById("status-text").textContent = text;
+  }
+
+  // ─── Fetch helpers ────────────────────────────────────────────────────────
+  async function fetchAPI(endpoint) {
+    const res = await fetch(`/api/${endpoint}?range=${activeRange}`);
+    if (!res.ok) throw new Error(`${endpoint} returned ${res.status}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    return json;
+  }
+
+  // ─── Number formatters ────────────────────────────────────────────────────
+  function fmt(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+    return n.toLocaleString();
+  }
+
+  function fmtSeconds(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.round(s % 60);
+    return `${m}m ${sec}s`;
+  }
+
+  // ─── Render GA4 ───────────────────────────────────────────────────────────
+  function renderGA4(payload) {
+    const rows = payload.data.rows || [];
+
+    const totals = rows.reduce((acc, r) => {
+      acc.sessions += r.sessions;
+      acc.users += r.active_users;
+      acc.duration += r.avg_session_duration * r.sessions; // weighted
+      return acc;
+    }, { sessions: 0, users: 0, duration: 0 });
+
+    document.getElementById("kpi-sessions").textContent = fmt(totals.sessions);
+    document.getElementById("kpi-users").textContent = fmt(totals.users);
+    document.getElementById("kpi-duration").textContent =
+      totals.sessions ? fmtSeconds(totals.duration / totals.sessions) : "—";
+
+    // Aggregate by channel
+    const byChannel = {};
+    rows.forEach(r => {
+      byChannel[r.channel] = (byChannel[r.channel] || 0) + r.sessions;
+    });
+
+    const labels = Object.keys(byChannel);
+    const values = Object.values(byChannel);
+
+    if (charts["sessions"]) charts["sessions"].destroy();
+    charts["sessions"] = new Chart(
+      document.getElementById("chart-sessions").getContext("2d"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: "#c8f135",
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: "#888" }, grid: { color: "#2a2a30" } },
+            y: { ticks: { color: "#888" }, grid: { color: "#2a2a30" } },
+          }
+        }
+      }
+    );
+  }
+
+  // ─── Render Metricool ─────────────────────────────────────────────────────
+  function renderMetricool(payload) {
+    const accounts = payload.data || {};
+    const count = Object.keys(accounts).length;
+    document.getElementById("kpi-accounts").textContent = count;
+
+    if (count > 0) {
+      document.getElementById("social-placeholder").style.display = "none";
+      document.getElementById("chart-social").style.display = "block";
+      // TODO: build social chart from accounts data once you've confirmed
+      // what fields Metricool returns for your account. Run scripts/test_metricool.py
+      // to inspect the raw response, then wire it up here.
+    }
+  }
+
+  // ─── Load all ─────────────────────────────────────────────────────────────
+  async function loadAll() {
+    setStatus("loading", "Fetching data…");
+
+    const results = await Promise.allSettled([
+      fetchAPI("ga4"),
+      fetchAPI("metricool"),
+    ]);
+
+    const [ga4Result, metricoolResult] = results;
+    const errors = [];
+
+    if (ga4Result.status === "fulfilled") {
+      renderGA4(ga4Result.value);
+    } else {
+      errors.push("GA4: " + ga4Result.reason.message);
+    }
+
+    if (metricoolResult.status === "fulfilled") {
+      renderMetricool(metricoolResult.value);
+    } else {
+      errors.push("Metricool: " + metricoolResult.reason.message);
+    }
+
+    if (errors.length === 0) {
+      setStatus("ok", `Updated just now · ${activeRange}`);
+    } else if (errors.length < results.length) {
+      setStatus("loading", `Partial data · ${errors.join(" · ")}`);
+    } else {
+      setStatus("error", errors.join(" · "));
+    }
+  }
+
+  // ─── Boot ─────────────────────────────────────────────────────────────────
+  loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+requests==2.31.0
+python-dotenv==1.0.0
+google-analytics-data==0.18.5
+google-auth==2.29.0
