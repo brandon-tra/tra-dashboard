@@ -13,7 +13,7 @@ from urllib.parse import urlparse, parse_qs
 # Allow importing from /lib when running locally
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib.config import EXCLUDED_ACCOUNT_IDS, METRICOOL_BASE_URL, METRICOOL_NETWORKS
+from lib.config import EXCLUDED_ACCOUNT_IDS, METRICOOL_BASE_URL
 from lib.date_utils import resolve_range
 
 # Load .env locally (Vercel injects env vars automatically in production)
@@ -30,45 +30,62 @@ def fetch_metricool_data(start_date: str, end_date: str) -> dict:
     Returns a dict keyed by account name.
     """
     api_key = os.environ.get("METRICOOL_API_KEY")
+    user_id = os.environ.get("METRICOOL_USER_ID")
+    blog_id = os.environ.get("METRICOOL_BLOG_ID")
+
     if not api_key:
         raise EnvironmentError("METRICOOL_API_KEY is not set")
+    if not user_id:
+        raise EnvironmentError("METRICOOL_USER_ID is not set")
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        "X-Mc-Auth": api_key,
     }
 
     # Step 1: Get all brand/client accounts
-    brands_url = f"{METRICOOL_BASE_URL}/brands"
-    brands_resp = requests.get(brands_url, headers=headers, timeout=15)
+    brands_url = f"{METRICOOL_BASE_URL}/admin/simpleProfiles"
+    auth_params = {"userId": user_id, "blogId": blog_id}
+    brands_resp = requests.get(brands_url, headers=headers, params=auth_params, timeout=15)
     brands_resp.raise_for_status()
-    brands = brands_resp.json().get("data", [])
+    brands = brands_resp.json()
 
     results = {}
 
     for brand in brands:
-        account_id = brand.get("id") or brand.get("slug")
+        account_id = str(brand.get("id") or brand.get("blogId"))
         name = brand.get("name", account_id)
 
-        # Skip excluded accounts
         if account_id in EXCLUDED_ACCOUNT_IDS:
             continue
 
+        print(f"  Fetching {name} ({account_id})...")
         account_data = {"name": name, "networks": {}}
 
-        # Step 2: Fetch stats per network for this brand
-        for network in METRICOOL_NETWORKS:
-            stats_url = (
-                f"{METRICOOL_BASE_URL}/brands/{account_id}/analytics"
-                f"?network={network}&start={start_date}&end={end_date}"
+        # Instagram posts
+        try:
+            resp = requests.get(
+                f"{METRICOOL_BASE_URL}/v2/analytics/posts/instagram",
+                headers=headers,
+                params={
+                    "userId": user_id,
+                    "blogId": account_id,
+                    "from": f"{start_date}T00:00:00",
+                    "to": f"{end_date}T23:59:59",
+                    "timezone": "America/New_York",
+                },
+                timeout=30,
             )
-            try:
-                stats_resp = requests.get(stats_url, headers=headers, timeout=15)
-                stats_resp.raise_for_status()
-                account_data["networks"][network] = stats_resp.json().get("data", {})
-            except requests.HTTPError as e:
-                # Network may not be connected for this account — that's fine
-                account_data["networks"][network] = {"error": str(e)}
+            resp.raise_for_status()
+            ig_data = resp.json()
+            account_data["networks"]["instagram"] = ig_data
+
+            # Extract real account name from first post if available
+            posts = ig_data.get("data", [])
+            if posts and posts[0].get("userId"):
+                account_data["name"] = posts[0]["userId"]
+        except requests.HTTPError as e:
+            account_data["networks"]["instagram"] = {"error": str(e)}
 
         results[account_id] = account_data
 

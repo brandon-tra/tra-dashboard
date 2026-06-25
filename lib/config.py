@@ -8,7 +8,7 @@ EXCLUDED_ACCOUNT_IDS = [
 ]
 
 # Metricool API base URL
-METRICOOL_BASE_URL = "https://app.metricool.com/api/v2"
+METRICOOL_BASE_URL = "https://app.metricool.com/api"
 
 # Networks to pull from Metricool (comment out any you don't need)
 METRICOOL_NETWORKS = [

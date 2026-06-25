@@ -19,6 +19,8 @@ from lib.date_utils import resolve_range
 
 range_token = sys.argv[1] if len(sys.argv) > 1 else "7d"
 start_date, end_date = resolve_range(range_token)
+import lib.config as cfg
+cfg.EXCLUDED_ACCOUNT_IDS = ["6233634", "6233645", "6233679", "6233690", "6233694", "6241176", "6241182", "6241185", "6241188", "6241208", "6241225", "6241230", "6241303", "6241391", "6241397", "6241398", "6241399", "6241403", "6241521", "6251561", "6251562"]
 
 print(f"\nFetching Metricool data: {start_date} → {end_date}\n")
 
